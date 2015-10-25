@@ -1,7 +1,6 @@
 package com.example.misha.gmailquickstart;
 
 import android.Manifest;
-import android.accounts.Account;
 import android.accounts.AccountManager;
 import android.content.Context;
 import android.content.Intent;
@@ -30,20 +29,22 @@ import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.client.util.ExponentialBackOff;
 import com.google.api.services.gmail.Gmail;
 import com.google.api.services.gmail.GmailScopes;
+import com.google.api.services.gmail.model.History;
 import com.google.api.services.gmail.model.Label;
 import com.google.api.services.gmail.model.ListLabelsResponse;
-import com.google.api.services.gmail.model.ListMessagesResponse;
 import com.google.api.services.gmail.model.Message;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.zip.CheckedInputStream;
 
 
 public class StartActivity extends ActionBarActivity
 {
+    AlarmReceiver alarm = new AlarmReceiver();
+
     GoogleAccountCredential mCredential;
 
     private static final int MY_PERMISSIONS_REQUEST_READ_CONTACTS = 10;
@@ -241,6 +242,16 @@ public class StartActivity extends ActionBarActivity
         }
     }
 
+    public void onStartClick(View view)
+    {
+        alarm.setAlarm(this);
+    }
+
+    public void onStopClick(View view)
+    {
+        alarm.cancelAlarm(this);
+    }
+
     private class MakeRequestTask extends AsyncTask<Void, Void, List<String>>
     {
         private com.google.api.services.gmail.Gmail mService = null;
@@ -352,22 +363,13 @@ public class StartActivity extends ActionBarActivity
         }
     }
 
-    private class LoadMailListTask extends AsyncTask<Void, Void, List<String>>
+    private class LoadMailListTask extends AsyncTask<Void, Void, List<Message>>
     {
-        private com.google.api.services.gmail.Gmail mService = null;
-        private String mUserId;
-
-        private Exception mLastError = null;
+        private GmailReader mService = null;
 
         public LoadMailListTask(GoogleAccountCredential credential)
         {
-            HttpTransport transport = AndroidHttp.newCompatibleTransport();
-            JsonFactory jsonFactory = JacksonFactory.getDefaultInstance();
-            mUserId = credential.getSelectedAccountName();
-            mService = new com.google.api.services.gmail.Gmail.Builder(
-                    transport, jsonFactory, credential)
-                    .setApplicationName("GMail API Android Quickstart")
-                    .build();
+            mService = new GmailReader(credential);
         }
 
         @Override
@@ -378,7 +380,7 @@ public class StartActivity extends ActionBarActivity
         }
 
         @Override
-        protected void onPostExecute(List<String> output)
+        protected void onPostExecute(List<Message> output)
         {
             super.onPostExecute(output);
             //mProgress.hide();
@@ -388,8 +390,20 @@ public class StartActivity extends ActionBarActivity
             }
             else
             {
-                output.add(0, "Data retrieved using the Gmail API:");
-                mMsg.setText(TextUtils.join("\n", output));
+                StringBuilder sb = new StringBuilder();
+                for (Message msg : output)
+                {
+                    try
+                    {
+                        sb.append(msg.toPrettyString());
+                    }
+                    catch (Exception e)
+                    {
+                        sb.append(msg.getId());
+                    }
+                    sb.append('\n');
+                }
+                mMsg.setText(sb.toString());
             }
         }
 
@@ -397,9 +411,9 @@ public class StartActivity extends ActionBarActivity
         protected void onCancelled()
         {
             super.onCancelled();
-            if (mLastError != null)
+            if (mService.getLastError() != null)
             {
-                mMsg.setText("The following error occurred:\n" + mLastError.getMessage());
+                mMsg.setText("The following error occurred:\n" + mService.getLastError().getMessage());
             }
             else
             {
@@ -408,44 +422,88 @@ public class StartActivity extends ActionBarActivity
         }
 
         @Override
-        protected List<String> doInBackground(Void... params)
+        protected List<Message> doInBackground(Void... params)
         {
-            try
+            List<Message> messages = mService.GetMessages(20);
+            if (mService.getLastError() != null)
             {
-                ListMessagesResponse response = mService.users().messages().list(mUserId).execute();
-                List<String> messages = new ArrayList<String>();
-                int counter = 0;
-                while (response.getMessages() != null)
-                {
-                    List<Message> msgRecs = response.getMessages();
-                    for (Message msgRec : msgRecs)
-                    {
-                        messages.add(msgRec.getId() + " / " + msgRec.getHistoryId());
-                        counter += 1;
-                    }
-                    if (counter > 20)
-                        break;
-                    if (response.getNextPageToken() != null)
-                    {
-                        String pageToken = response.getNextPageToken();
-                        response = mService.users().messages().list(mUserId)//.setLabelIds(labelIds)
-                                .setPageToken(pageToken).execute();
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
-                return messages;
-            }
-            catch (Exception e)
-            {
-                mLastError = e;
+                messages = null;
                 cancel(true);
-                return null;
             }
+            return messages;
         }
 
     }
 
+    private class LoadHistoryListTask extends AsyncTask<Void, Void, List<History>>
+    {
+        private GmailReader mService = null;
+
+        public LoadHistoryListTask(GoogleAccountCredential credential)
+        {
+            mService = new GmailReader(credential);
+        }
+
+        @Override
+        protected void onPreExecute()
+        {
+            super.onPreExecute();
+            mMsg.setText("Getting mail list...");
+        }
+
+        @Override
+        protected void onPostExecute(List<History> output)
+        {
+            super.onPostExecute(output);
+            //mProgress.hide();
+            if (output == null || output.size() == 0)
+            {
+                mMsg.setText("No results returned.");
+            }
+            else
+            {
+                StringBuilder sb = new StringBuilder();
+                for (History msg : output)
+                {
+                    try
+                    {
+                        sb.append(msg.toPrettyString());
+                    }
+                    catch (Exception e)
+                    {
+                        sb.append(msg.getId());
+                    }
+                    sb.append('\n');
+                }
+                mMsg.setText(sb.toString());
+            }
+        }
+
+        @Override
+        protected void onCancelled()
+        {
+            super.onCancelled();
+            if (mService.getLastError() != null)
+            {
+                mMsg.setText("The following error occurred:\n" + mService.getLastError().getMessage());
+            }
+            else
+            {
+                mMsg.setText("Request cancelled.");
+            }
+        }
+
+        @Override
+        protected List<History> doInBackground(Void... params)
+        {
+            List<History> messages = mService.GetHistory(BigInteger.ZERO, 100);
+            if (mService.getLastError() != null)
+            {
+                messages = null;
+                cancel(true);
+            }
+            return messages;
+        }
+
+    }
 }
