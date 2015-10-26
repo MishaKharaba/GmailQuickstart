@@ -13,6 +13,7 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
+import android.support.v7.app.AppCompatActivity;
 import android.text.TextUtils;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -41,7 +42,7 @@ import java.util.Arrays;
 import java.util.List;
 
 
-public class StartActivity extends ActionBarActivity
+public class StartActivity extends AppCompatActivity
 {
     AlarmReceiver alarm = new AlarmReceiver();
 
@@ -250,6 +251,12 @@ public class StartActivity extends ActionBarActivity
     public void onStopClick(View view)
     {
         alarm.cancelAlarm(this);
+    }
+
+    public void onAlarmClick(View view)
+    {
+        Intent intent = new Intent(this, AlarmClockScreenActivity.class);
+        startActivity(intent);
     }
 
     private class MakeRequestTask extends AsyncTask<Void, Void, List<String>>

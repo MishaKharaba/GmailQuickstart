@@ -50,6 +50,13 @@
             android:layout_marginLeft="@dimen/activity_horizontal_margin"
             android:onClick="onStopClick"
             android:text="Stop"/>
+
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="@dimen/activity_horizontal_margin"
+            android:onClick="onAlarmClick"
+            android:text="Alarm"/>
     </LinearLayout>
 
     <ScrollView
