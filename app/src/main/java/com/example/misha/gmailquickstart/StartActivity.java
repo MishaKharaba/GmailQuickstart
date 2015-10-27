@@ -284,6 +284,8 @@ public class StartActivity extends AppCompatActivity
         {
             try
             {
+                ExchangeReceiver r = new ExchangeReceiver();
+                List<String> folders = r.getFolders();
                 return getDataFromApi();
             }
             catch (Exception e)
